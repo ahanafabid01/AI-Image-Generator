@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Image Generator - Create Stunning Images with AI</title>
-    <link rel="stylesheet" href="styles.css">
+     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
@@ -27,12 +27,16 @@
                 <div class="control-group">
                     <label for="model">AI Model</label>
                     <select id="model">
-                        <option value="flux">FLUX (Best Quality)</option>
-                        <option value="flux-realism">FLUX Realism</option>
-                        <option value="flux-anime">FLUX Anime</option>
-                        <option value="flux-3d">FLUX 3D</option>
-                        <option value="turbo">Turbo (Fastest)</option>
+                        <option value="black-forest-labs/FLUX.1-schnell">FLUX Schnell (Fast)</option>
+                        <option value="black-forest-labs/FLUX.1-dev">FLUX Dev (Quality)</option>
+                        <option value="stabilityai/stable-diffusion-xl-base-1.0">Stable Diffusion XL</option>
+                        <option value="runwayml/stable-diffusion-v1-5">Stable Diffusion 1.5</option>
                     </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="steps">Inference Steps</label>
+                    <input type="number" id="steps" min="10" max="100" value="50">
                 </div>
             </div>
 
@@ -79,12 +83,14 @@
         </div>
 
         <footer>
-            <p>Crafted by AHANAF ABID SAZID</p>
+            <p>Craftedhttps://ai-image-generator-nexaurro.vercel.app/
+                 by AHANAF ABID SAZID</p>
         </footer>
     </div>
 
     <script>
-        // Using Pollinations.ai - completely FREE, no API key needed!
+        // API calls are now handled by the backend serverless function
+        // No API key needed in the frontend!
         let currentImageBlob = null;
 
         function useExample(element) {
@@ -116,6 +122,7 @@
         async function generateImage() {
             const prompt = document.getElementById('prompt').value.trim();
             const model = document.getElementById('model').value;
+            const steps = parseInt(document.getElementById('steps').value);
 
             if (!prompt) {
                 showError('Please enter a prompt to generate an image.');
@@ -126,23 +133,37 @@
             document.getElementById('resultSection').classList.remove('active');
 
             try {
-                // Using Pollinations.ai - completely free, no API key needed!
-                const encodedPrompt = encodeURIComponent(prompt);
-                const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=${model}&width=1024&height=1024&nologo=true&seed=${Date.now()}`;
-                
-                // Fetch the image
-                const response = await fetch(imageUrl);
-                
+                // Call our serverless function instead of Hugging Face API directly
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        model: model,
+                        steps: steps
+                    })
+                });
+
                 if (!response.ok) {
-                    throw new Error(`Failed to generate image: ${response.status}`);
+                    const contentType = response.headers.get('content-type');
+                    let errorMessage = `Error: ${response.status}`;
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    }
+                    
+                    throw new Error(errorMessage);
                 }
 
                 const blob = await response.blob();
                 currentImageBlob = blob;
                 
-                const localImageUrl = URL.createObjectURL(blob);
+                const imageUrl = URL.createObjectURL(blob);
                 const imgElement = document.getElementById('generatedImage');
-                imgElement.src = localImageUrl;
+                imgElement.src = imageUrl;
                 
                 document.getElementById('resultSection').classList.add('active');
                 
