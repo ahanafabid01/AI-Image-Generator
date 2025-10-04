@@ -17,7 +17,7 @@ A beautiful AI-powered image generator built with HTML, CSS, and JavaScript. Thi
 
 ## 🚀 Live Demo
 
-Visit: [Your Vercel URL here after deployment]
+**[✨ Try it now: ai-image-generator-psi-five.vercel.app](https://ai-image-generator-psi-five.vercel.app)**
 
 ## 🛠️ Technologies Used
 
