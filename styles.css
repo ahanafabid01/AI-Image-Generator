@@ -9,7 +9,7 @@
 :root {
     --neon-blue: #00f3ff;
     --neon-pink: #ff00ff;
-    --neon-purple: #b300ff;
+    --neon-purple: #4a0d64;
     --neon-green: #00ff88;
     --dark-bg: #0a0a0f;
     --dark-card: #13131a;
@@ -48,15 +48,15 @@ header h1 {
     font-family: 'Orbitron', sans-serif;
     font-size: clamp(2.5rem, 6vw, 4.5rem);
     font-weight: 900;
-    background: linear-gradient(135deg, var(--neon-pink), var(--neon-pink), var(--neon-purple));
+    background: linear-gradient(135deg, var(--neon-blue), var(--neon-pink), var(--neon-purple));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     margin-bottom: 20px;
     text-transform: uppercase;
     letter-spacing: 3px;
-    animation: glow-pulse 3s ease-in-out infinite;
-    text-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+    /* animation: glow-pulse 3s ease-in-out infinite; */
+    /* text-shadow: 0 0 20px rgba(0, 243, 255, 0.5); */
 }
 
 @keyframes glow-pulse {
