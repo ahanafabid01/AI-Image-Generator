@@ -229,6 +229,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
-**Made with ❤️ by AHANAF ABID SAZID**
+**Made by AHANAF ABID SAZID**
 
 If you found this project helpful, please give it a ⭐ on GitHub!
