@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Generator - Create Stunning Images with AI</title>
+     <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>✨ AI Image Generator</h1>
+            <p class="subtitle">Transform your imagination into stunning visuals with AI</p>
+        </header>
+
+        <div class="main-content">
+            <div class="input-section">
+                <label for="prompt">Enter Your Prompt</label>
+                <textarea 
+                    id="prompt" 
+                    class="prompt-input" 
+                    placeholder="Describe the image you want to generate... e.g., 'A majestic lion standing on a cliff at sunset, photorealistic, 4k'"
+                ></textarea>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label for="model">AI Model</label>
+                    <select id="model">
+                        <option value="black-forest-labs/FLUX.1-schnell">FLUX Schnell (Fast)</option>
+                        <option value="black-forest-labs/FLUX.1-dev">FLUX Dev (Quality)</option>
+                        <option value="stabilityai/stable-diffusion-xl-base-1.0">Stable Diffusion XL</option>
+                        <option value="runwayml/stable-diffusion-v1-5">Stable Diffusion 1.5</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="steps">Inference Steps</label>
+                    <input type="number" id="steps" min="10" max="100" value="50">
+                </div>
+            </div>
+
+            <button class="generate-btn" onclick="generateImage()">
+                Generate Image
+            </button>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Creating your image... This may take 30-60 seconds</p>
+            </div>
+
+            <div class="result-section" id="resultSection">
+                <h2 style="margin-bottom: 20px; color: #333;">Your Generated Image</h2>
+                <div class="image-container">
+                    <img id="generatedImage" class="generated-image" alt="Generated image">
+                </div>
+                <div style="text-align: center;">
+                    <button class="download-btn" onclick="downloadImage()">
+                        Download Image
+                    </button>
+                </div>
+            </div>
+
+            <div class="examples">
+                <h3>Try These Example Prompts:</h3>
+                <div class="example-prompts">
+                    <div class="example-prompt" onclick="useExample(this)">
+                        A futuristic city at night with neon lights and flying cars
+                    </div>
+                    <div class="example-prompt" onclick="useExample(this)">
+                        A magical forest with glowing mushrooms and fairy lights
+                    </div>
+                    <div class="example-prompt" onclick="useExample(this)">
+                        A steampunk robot playing chess in a Victorian library
+                    </div>
+                    <div class="example-prompt" onclick="useExample(this)">
+                        An underwater palace made of coral and pearls
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Crafted with ❤️ by AHANAF ABID SAZID</p>
+        </footer>
+    </div>
+
+    <script>
+        // API calls are now handled by the backend serverless function
+        // No API key needed in the frontend!
+        let currentImageBlob = null;
+
+        function useExample(element) {
+            document.getElementById('prompt').value = element.textContent.trim();
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.classList.add('active');
+            setTimeout(() => {
+                errorEl.classList.remove('active');
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            const loadingEl = document.getElementById('loading');
+            const btn = document.querySelector('.generate-btn');
+            
+            if (show) {
+                loadingEl.classList.add('active');
+                btn.disabled = true;
+            } else {
+                loadingEl.classList.remove('active');
+                btn.disabled = false;
+            }
+        }
+
+        async function generateImage() {
+            const prompt = document.getElementById('prompt').value.trim();
+            const model = document.getElementById('model').value;
+            const steps = parseInt(document.getElementById('steps').value);
+
+            if (!prompt) {
+                showError('Please enter a prompt to generate an image.');
+                return;
+            }
+
+            showLoading(true);
+            document.getElementById('resultSection').classList.remove('active');
+
+            try {
+                // Call our serverless function instead of Hugging Face API directly
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        model: model,
+                        steps: steps
+                    })
+                });
+
+                if (!response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    let errorMessage = `Error: ${response.status}`;
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+
+                const blob = await response.blob();
+                currentImageBlob = blob;
+                
+                const imageUrl = URL.createObjectURL(blob);
+                const imgElement = document.getElementById('generatedImage');
+                imgElement.src = imageUrl;
+                
+                document.getElementById('resultSection').classList.add('active');
+                
+                imgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message || 'Failed to generate image. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function downloadImage() {
+            if (!currentImageBlob) {
+                showError('No image to download.');
+                return;
+            }
+
+            const url = URL.createObjectURL(currentImageBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai-generated-${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('prompt').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                generateImage();
+            }
+        });
+    </script>
+</body>
+</html>
