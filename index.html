@@ -84,7 +84,7 @@
     </div>
 
     <script>
-        // Using Pollinations.ai - completely FREE, no API key needed!
+        // API calls are handled by the backend serverless function.
         let currentImageBlob = null;
 
         function useExample(element) {
@@ -126,15 +126,27 @@
             document.getElementById('resultSection').classList.remove('active');
 
             try {
-                // Using Pollinations.ai - completely free, no API key needed!
-                const encodedPrompt = encodeURIComponent(prompt);
-                const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=${model}&width=1024&height=1024&nologo=true&seed=${Date.now()}`;
-                
-                // Fetch the image
-                const response = await fetch(imageUrl);
-                
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        model: model,
+                    })
+                });
+
                 if (!response.ok) {
-                    throw new Error(`Failed to generate image: ${response.status}`);
+                    const contentType = response.headers.get('content-type');
+                    let errorMessage = `Error: ${response.status}`;
+
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    }
+
+                    throw new Error(errorMessage);
                 }
 
                 const blob = await response.blob();

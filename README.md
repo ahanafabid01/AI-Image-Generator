@@ -1,6 +1,6 @@
 # 🎨 AI Image Generator
 
-A beautiful AI-powered image generator built with HTML, CSS, and JavaScript. This application uses Hugging Face's powerful AI models to create stunning images from text descriptions.
+A beautiful AI-powered image generator built with HTML, CSS, and JavaScript. This application uses OpenRouter to refine prompts before creating stunning images from text descriptions.
 
 ![AI Image Generator](https://img.shields.io/badge/AI-Image%20Generator-blue)
 ![Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black)
@@ -9,7 +9,7 @@ A beautiful AI-powered image generator built with HTML, CSS, and JavaScript. Thi
 ## ✨ Features
 
 - 🎨 Generate stunning images from text prompts
-- 🤖 Multiple AI models to choose from (FLUX, Stable Diffusion)
+- 🤖 Multiple visual styles to choose from (FLUX-inspired, Stable Diffusion-inspired)
 - ⚡ Fast and responsive interface
 - 📥 Download generated images
 - 🔒 Secure API key management with serverless functions
@@ -23,7 +23,7 @@ A beautiful AI-powered image generator built with HTML, CSS, and JavaScript. Thi
 
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript
 - **Backend**: Vercel Serverless Functions (Node.js)
-- **AI API**: Hugging Face Inference API
+- **AI API**: OpenRouter OpenAI-compatible API
 - **Hosting**: Vercel
 
 ## 📋 Prerequisites
@@ -32,16 +32,13 @@ Before you begin, ensure you have:
 
 - A [GitHub](https://github.com) account
 - A [Vercel](https://vercel.com) account (free tier works great)
-- A [Hugging Face](https://huggingface.co) account and API token
+- An [OpenRouter](https://openrouter.ai) account and API key
 
-## 🔑 Getting Your Hugging Face API Token
+## 🔑 Getting Your OpenRouter API Key
 
-1. Go to [Hugging Face](https://huggingface.co) and create an account (if you don't have one)
-2. Navigate to **Settings** → **Access Tokens**
-3. Click **New Token**
-4. Give it a name (e.g., "AI Image Generator")
-5. Select **Read** permission
-6. Copy the token (you'll need it for deployment)
+1. Go to [OpenRouter](https://openrouter.ai) and create an account if needed.
+2. Open your account API settings and create an API key.
+3. Copy the key for deployment.
 
 ## 📦 Deployment Steps
 
@@ -79,9 +76,17 @@ Before you begin, ensure you have:
 
 3. **Configure Environment Variables**:
    - Before clicking "Deploy", scroll down to **Environment Variables**
-   - Add the following variable:
-     - **Name**: `HUGGINGFACE_API_TOKEN`
-     - **Value**: [Your Hugging Face API token]
+    - Add the following variables:
+       - **Name**: `OPENAI_API_KEY`
+       - **Value**: [Your OpenRouter API key]
+       - **Name**: `OPENAI_MODEL`
+       - **Value**: `qwen/qwen3.6-plus:free`
+       - **Name**: `OPENAI_BASE_URL`
+       - **Value**: `https://openrouter.ai/api/v1`
+       - **Name**: `OPENROUTER_APP_NAME`
+       - **Value**: `AI-Image-generator`
+       - **Name**: `OPENROUTER_APP_URL`
+       - **Value**: `https://localhost`
    - Click **"Add"**
 
 4. **Deploy**:
@@ -114,7 +119,11 @@ To run this project locally with the serverless function:
 
 3. **Create a `.env` file** in the root directory:
    ```env
-   HUGGINGFACE_API_TOKEN=your_token_here
+   OPENAI_API_KEY=your_openrouter_key_here
+   OPENAI_MODEL=qwen/qwen3.6-plus:free
+   OPENAI_BASE_URL=https://openrouter.ai/api/v1
+   OPENROUTER_APP_NAME=AI-Image-generator
+   OPENROUTER_APP_URL=https://localhost
    ```
 
 4. **Run the development server**:
@@ -141,8 +150,8 @@ ai-image-generator/
 
 1. **Your frontend** (index.html) sends a request to `/api/generate`
 2. **Vercel serverless function** receives the request
-3. The function uses the **API token from environment variables** (secure)
-4. It calls the **Hugging Face API** on your behalf
+3. The function uses the **API key from environment variables** (secure)
+4. It calls the **OpenRouter API** on your behalf to refine the prompt before generating the image
 5. The image is returned to the frontend
 6. **Your API key is never exposed** in the browser or GitHub
 
@@ -171,17 +180,17 @@ You can extend the `api/generate.js` file to add:
 
 ## 🐛 Troubleshooting
 
-### "Server configuration error: API token not set"
-- Make sure you added the `HUGGINGFACE_API_TOKEN` environment variable in Vercel
+### "Server configuration error: API key not set"
+- Make sure you added the `OPENAI_API_KEY` environment variable in Vercel
 - Redeploy your project after adding the variable
 
-### "Model is loading. Please wait 20-30 seconds and try again."
-- This is normal for free-tier Hugging Face models
-- Wait and try again after 30 seconds
+### Image generation fails after prompt enhancement
+- Check that your OpenRouter API key is valid
+- Verify the `OPENAI_BASE_URL` and `OPENAI_MODEL` variables are set correctly
 
 ### Images not generating
 - Check the browser console for errors
-- Verify your API token is valid
+- Verify your API key is valid
 - Try a different AI model
 
 ## 🌟 Available AI Models
@@ -217,15 +226,15 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ## 🙏 Acknowledgments
 
-- [Hugging Face](https://huggingface.co) for the amazing AI models
+- [OpenRouter](https://openrouter.ai) for prompt generation
 - [Vercel](https://vercel.com) for free hosting and serverless functions
 - The open-source community for inspiration
 
 ## 🔗 Useful Links
 
-- [Hugging Face Models](https://huggingface.co/models)
+- [OpenRouter Models](https://openrouter.ai/models)
 - [Vercel Documentation](https://vercel.com/docs)
-- [Hugging Face API Docs](https://huggingface.co/docs/api-inference/index)
+- [OpenRouter API Docs](https://openrouter.ai/docs)
 
 ---
 

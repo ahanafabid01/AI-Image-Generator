@@ -133,7 +133,7 @@
             document.getElementById('resultSection').classList.remove('active');
 
             try {
-                // Call our serverless function instead of Hugging Face API directly
+                // Call our serverless function instead of talking to the image service directly
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {

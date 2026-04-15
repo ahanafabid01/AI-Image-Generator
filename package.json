@@ -2,7 +2,7 @@
   "name": "ai-image-generator",
   "version": "1.0.0",
   "type": "module",
-  "description": "AI-powered image generator using Hugging Face API",
+  "description": "AI-powered image generator using OpenRouter and a serverless render proxy",
   "main": "index.html",
   "scripts": {
     "dev": "vercel dev",
@@ -11,7 +11,7 @@
   "keywords": [
     "ai",
     "image-generation",
-    "huggingface",
+    "openrouter",
     "vercel",
     "serverless"
   ],

@@ -1,5 +1,37 @@
-// Vercel Serverless Function to proxy Hugging Face API requests
+// Vercel Serverless Function to proxy OpenRouter requests and return an image response
 // This keeps your API key secure on the server side
+
+const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const DEFAULT_OPENROUTER_MODEL = 'qwen/qwen3.6-plus:free';
+const DEFAULT_APP_NAME = 'AI-Image-generator';
+const DEFAULT_APP_URL = 'https://localhost';
+
+function buildStyleHint(model) {
+    const styleHints = {
+        flux: 'photorealistic, cinematic lighting, ultra-detailed, high contrast',
+        'flux-realism': 'photorealistic, realistic textures, natural lighting, sharp detail',
+        'flux-anime': 'anime illustration, clean line work, vibrant color palette, expressive composition',
+        'flux-3d': '3D render, sculpted forms, studio lighting, polished surfaces',
+        turbo: 'fast concept art, clean composition, strong visual clarity',
+    };
+
+    return styleHints[model] || 'high-quality digital art, strong composition, detailed scene';
+}
+
+async function readErrorMessage(response) {
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+        const data = await response.json();
+        return data.error || data.message || `API Error: ${response.status}`;
+    }
+
+    try {
+        return await response.text();
+    } catch {
+        return `API Error: ${response.status}`;
+    }
+}
 
 export default async function handler(req, res) {
     // Enable CORS
@@ -23,68 +55,83 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { prompt, model, steps } = req.body;
+        const { prompt, model } = req.body;
 
         // Validate input
         if (!prompt) {
             return res.status(400).json({ error: 'Prompt is required' });
         }
 
-        // Get API token from environment variable
-        const API_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
+        const apiKey = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
+        const baseUrl = (process.env.OPENAI_BASE_URL || DEFAULT_OPENROUTER_BASE_URL).replace(/\/$/, '');
+        const openRouterModel = process.env.OPENAI_MODEL || DEFAULT_OPENROUTER_MODEL;
+        const appName = process.env.OPENROUTER_APP_NAME || DEFAULT_APP_NAME;
+        const appUrl = process.env.OPENROUTER_APP_URL || DEFAULT_APP_URL;
 
-        if (!API_TOKEN) {
-            console.error('HUGGINGFACE_API_TOKEN not found in environment variables');
-            return res.status(500).json({ error: 'Server configuration error: API token not set' });
+        if (!apiKey) {
+            console.error('OPENAI_API_KEY not found in environment variables');
+            return res.status(500).json({ error: 'Server configuration error: API key not set' });
         }
 
-        // Default values
-        const selectedModel = model || 'black-forest-labs/FLUX.1-schnell';
-        const inferenceSteps = steps || 50;
+        const selectedModel = model || 'flux';
+        const styleHint = buildStyleHint(selectedModel);
 
-        console.log(`Generating image with model: ${selectedModel}`);
+        console.log(`Generating image with OpenRouter model: ${openRouterModel}`);
 
-        // Call Hugging Face API
-        const response = await fetch(
-            `https://api-inference.huggingface.co/models/${selectedModel}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${API_TOKEN}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    inputs: prompt,
-                    parameters: {
-                        num_inference_steps: inferenceSteps,
-                    }
-                })
+        const promptResponse = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': appUrl,
+                'X-OpenRouter-Title': appName,
+            },
+            body: JSON.stringify({
+                model: openRouterModel,
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You rewrite user ideas into a single, vivid text-to-image prompt. Return only the prompt, with no quotes, markdown, labels, or extra commentary.',
+                    },
+                    {
+                        role: 'user',
+                        content: `Write a detailed image prompt for: ${prompt}\nStyle direction: ${styleHint}`,
+                    },
+                ],
+                temperature: 0.8,
+                max_tokens: 200,
+            }),
+        });
+
+        let imagePrompt = prompt;
+
+        if (promptResponse.ok) {
+            const promptData = await promptResponse.json();
+            const refinedPrompt = promptData?.choices?.[0]?.message?.content?.trim();
+
+            if (refinedPrompt) {
+                imagePrompt = refinedPrompt;
             }
-        );
+        } else {
+            const errorMessage = await readErrorMessage(promptResponse);
+            console.error('OpenRouter prompt generation error:', errorMessage);
+        }
+
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?model=${encodeURIComponent(selectedModel)}&width=1024&height=1024&nologo=true&seed=${Date.now()}`;
+
+        const response = await fetch(imageUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'image/png,image/*;q=0.9,*/*;q=0.8',
+            },
+            cache: 'no-store',
+        });
 
         // Handle API errors
         if (!response.ok) {
-            const contentType = response.headers.get('content-type');
-            let errorMessage = `API Error: ${response.status}`;
-
-            if (contentType && contentType.includes('application/json')) {
-                const errorData = await response.json();
-                errorMessage = errorData.error || errorMessage;
-            }
-
-            console.error('Hugging Face API Error:', errorMessage);
-
-            if (response.status === 503) {
-                return res.status(503).json({ 
-                    error: 'Model is loading. Please wait 20-30 seconds and try again.' 
-                });
-            } else if (response.status === 401) {
-                return res.status(401).json({ 
-                    error: 'API authentication failed. Please check your API key.' 
-                });
-            } else {
-                return res.status(response.status).json({ error: errorMessage });
-            }
+            const errorMessage = await readErrorMessage(response);
+            console.error('Image generation error:', errorMessage);
+            return res.status(response.status).json({ error: errorMessage || 'Image generation failed' });
         }
 
         // Get the image blob
