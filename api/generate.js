@@ -2,16 +2,17 @@
 // This keeps your API key secure on the server side
 
 const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-const DEFAULT_OPENROUTER_MODEL = 'qwen/qwen3.6-plus:free';
+const DEFAULT_OPENROUTER_MODEL = 'mistral/mistral-7b-instruct:free';
 const DEFAULT_APP_NAME = 'AI-Image-generator';
 const DEFAULT_APP_URL = 'https://localhost';
+const MAX_PROMPT_LENGTH = 2000;
+const API_TIMEOUT_MS = 55000;
 
 function buildStyleHint(model) {
     const styleHints = {
         flux: 'photorealistic, cinematic lighting, ultra-detailed, high contrast',
         'flux-realism': 'photorealistic, realistic textures, natural lighting, sharp detail',
         'flux-anime': 'anime illustration, clean line work, vibrant color palette, expressive composition',
-        'flux-3d': '3D render, sculpted forms, studio lighting, polished surfaces',
         turbo: 'fast concept art, clean composition, strong visual clarity',
     };
 
@@ -34,14 +35,10 @@ async function readErrorMessage(response) {
 }
 
 export default async function handler(req, res) {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Credentials', true);
+    // Enable CORS for this specific endpoint
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     // Handle OPTIONS request for CORS preflight
     if (req.method === 'OPTIONS') {
@@ -58,8 +55,16 @@ export default async function handler(req, res) {
         const { prompt, model } = req.body;
 
         // Validate input
-        if (!prompt) {
+        if (!prompt || typeof prompt !== 'string') {
             return res.status(400).json({ error: 'Prompt is required' });
+        }
+
+        if (prompt.length > MAX_PROMPT_LENGTH) {
+            return res.status(400).json({ error: `Prompt must be under ${MAX_PROMPT_LENGTH} characters` });
+        }
+
+        if (prompt.trim().length === 0) {
+            return res.status(400).json({ error: 'Prompt cannot be empty' });
         }
 
         const apiKey = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
@@ -78,8 +83,12 @@ export default async function handler(req, res) {
 
         console.log(`Generating image with OpenRouter model: ${openRouterModel}`);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
         const promptResponse = await fetch(`${baseUrl}/chat/completions`, {
             method: 'POST',
+            signal: controller.signal,
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
@@ -101,7 +110,7 @@ export default async function handler(req, res) {
                 temperature: 0.8,
                 max_tokens: 200,
             }),
-        });
+        }).finally(() => clearTimeout(timeoutId));
 
         let imagePrompt = prompt;
 
@@ -119,13 +128,16 @@ export default async function handler(req, res) {
 
         const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?model=${encodeURIComponent(selectedModel)}&width=1024&height=1024&nologo=true&seed=${Date.now()}`;
 
+        const imageController = new AbortController();
+        const imageTimeoutId = setTimeout(() => imageController.abort(), API_TIMEOUT_MS);
+
         const response = await fetch(imageUrl, {
             method: 'GET',
+            signal: imageController.signal,
             headers: {
                 'Accept': 'image/png,image/*;q=0.9,*/*;q=0.8',
             },
-            cache: 'no-store',
-        });
+        }).finally(() => clearTimeout(imageTimeoutId));
 
         // Handle API errors
         if (!response.ok) {
@@ -144,6 +156,11 @@ export default async function handler(req, res) {
         res.status(200).send(buffer);
 
     } catch (error) {
+        if (error.name === 'AbortError') {
+            console.error('Request timeout:', error);
+            return res.status(408).json({ error: 'Request timeout. The operation took too long.' });
+        }
+        
         console.error('Server error:', error);
         res.status(500).json({ 
             error: error.message || 'Internal server error' 

@@ -153,6 +153,16 @@ header h1 {
     opacity: 0.6;
 }
 
+#charCount {
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+/* Character count warning when over 80% */
+#charCount.warning {
+    color: #ffaa00;
+}
+
 /* Controls */
 .controls {
     display: grid;

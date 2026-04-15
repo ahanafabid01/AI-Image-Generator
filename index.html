@@ -19,24 +19,27 @@
                 <textarea 
                     id="prompt" 
                     class="prompt-input" 
+                    maxlength="2000"
                     placeholder="Describe the image you want to generate... e.g., 'A majestic lion standing on a cliff at sunset, photorealistic, 4k'"
                 ></textarea>
+                <small style="color: var(--text-secondary); margin-top: 8px; display: block;">
+                    <span id="charCount">0</span> / 2000 characters
+                </small>
             </div>
 
             <div class="controls">
                 <div class="control-group">
-                    <label for="model">AI Model</label>
+                    <label for="model">Visual Style</label>
                     <select id="model">
-                        <option value="flux">FLUX (Best Quality)</option>
-                        <option value="flux-realism">FLUX Realism</option>
-                        <option value="flux-anime">FLUX Anime</option>
-                        <option value="flux-3d">FLUX 3D</option>
-                        <option value="turbo">Turbo (Fastest)</option>
+                        <option value="flux">Photorealistic (Best Quality)</option>
+                        <option value="flux-realism">Realistic</option>
+                        <option value="flux-anime">Anime</option>
+                        <option value="turbo">Fast & Simple</option>
                     </select>
                 </div>
             </div>
 
-            <button class="generate-btn" onclick="generateImage()">
+            <button class="generate-btn" id="generateBtn">
                 Generate Image
             </button>
 
@@ -53,7 +56,7 @@
                     <img id="generatedImage" class="generated-image" alt="Generated image">
                 </div>
                 <div style="text-align: center;">
-                    <button class="download-btn" onclick="downloadImage()">
+                    <button class="download-btn" id="downloadBtn">
                         Download Image
                     </button>
                 </div>
@@ -62,16 +65,16 @@
             <div class="examples">
                 <h3>Try These Example Prompts:</h3>
                 <div class="example-prompts">
-                    <div class="example-prompt" onclick="useExample(this)">
+                    <div class="example-prompt" data-prompt="A futuristic city at night with neon lights and flying cars">
                         A futuristic city at night with neon lights and flying cars
                     </div>
-                    <div class="example-prompt" onclick="useExample(this)">
+                    <div class="example-prompt" data-prompt="A magical forest with glowing mushrooms and fairy lights">
                         A magical forest with glowing mushrooms and fairy lights
                     </div>
-                    <div class="example-prompt" onclick="useExample(this)">
+                    <div class="example-prompt" data-prompt="A steampunk robot playing chess in a Victorian library">
                         A steampunk robot playing chess in a Victorian library
                     </div>
-                    <div class="example-prompt" onclick="useExample(this)">
+                    <div class="example-prompt" data-prompt="An underwater palace made of coral and pearls">
                         An underwater palace made of coral and pearls
                     </div>
                 </div>
@@ -84,50 +87,119 @@
     </div>
 
     <script>
-        // API calls are handled by the backend serverless function.
+        // Configuration
+        const API_TIMEOUT_MS = 70000; // 70 seconds
+        const MAX_PROMPT_LENGTH = 2000;
+
+        // State
         let currentImageBlob = null;
+        let isGenerating = false;
 
-        function useExample(element) {
-            document.getElementById('prompt').value = element.textContent.trim();
-        }
+        // DOM Elements
+        const promptInput = document.getElementById('prompt');
+        const generateBtn = document.getElementById('generateBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const errorEl = document.getElementById('errorMessage');
+        const loadingEl = document.getElementById('loading');
+        const resultSection = document.getElementById('resultSection');
+        const generatedImage = document.getElementById('generatedImage');
+        const modelSelect = document.getElementById('model');
+        const charCount = document.getElementById('charCount');
+        const examplePrompts = document.querySelectorAll('.example-prompt');
 
+        // Update character count
+        promptInput.addEventListener('input', (e) => {
+            const length = e.target.value.length;
+            charCount.textContent = length;
+            
+            // Show warning when over 80% of limit
+            if (length > MAX_PROMPT_LENGTH * 0.8) {
+                charCount.classList.add('warning');
+            } else {
+                charCount.classList.remove('warning');
+            }
+        });
+
+        // Example prompt click handler
+        examplePrompts.forEach(prompt => {
+            prompt.addEventListener('click', () => {
+                promptInput.value = prompt.dataset.prompt;
+                charCount.textContent = prompt.dataset.prompt.length;
+                promptInput.focus();
+            });
+        });
+
+        // Keyboard shortcut: Ctrl+Enter to generate
+        promptInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                generateImage();
+            }
+        });
+
+        // Generate button handler
+        generateBtn.addEventListener('click', generateImage);
+
+        // Download button handler
+        downloadBtn.addEventListener('click', downloadImage);
+
+        // Utility: Show error message
         function showError(message) {
-            const errorEl = document.getElementById('errorMessage');
             errorEl.textContent = message;
             errorEl.classList.add('active');
-            setTimeout(() => {
-                errorEl.classList.remove('active');
-            }, 5000);
+            console.error('User error:', message);
         }
 
-        function showLoading(show) {
-            const loadingEl = document.getElementById('loading');
-            const btn = document.querySelector('.generate-btn');
+        // Utility: Hide error message
+        function hideError() {
+            errorEl.classList.remove('active');
+        }
+
+        // Utility: Show/hide loading state
+        function setLoading(show) {
+            isGenerating = show;
+            generateBtn.disabled = show;
             
             if (show) {
                 loadingEl.classList.add('active');
-                btn.disabled = true;
+                resultSection.classList.remove('active');
             } else {
                 loadingEl.classList.remove('active');
-                btn.disabled = false;
             }
         }
 
+        // Main: Generate Image
         async function generateImage() {
-            const prompt = document.getElementById('prompt').value.trim();
-            const model = document.getElementById('model').value;
+            // Prevent multiple simultaneous requests
+            if (isGenerating) {
+                showError('Already generating. Please wait...');
+                return;
+            }
 
+            const prompt = promptInput.value.trim();
+            const model = modelSelect.value;
+
+            // Validation
             if (!prompt) {
                 showError('Please enter a prompt to generate an image.');
                 return;
             }
 
-            showLoading(true);
-            document.getElementById('resultSection').classList.remove('active');
+            if (prompt.length > MAX_PROMPT_LENGTH) {
+                showError(`Prompt must be under ${MAX_PROMPT_LENGTH} characters.`);
+                return;
+            }
+
+            hideError();
+            setLoading(true);
 
             try {
+                // Create abort controller with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
                 const response = await fetch('/api/generate', {
                     method: 'POST',
+                    signal: controller.signal,
                     headers: {
                         'Content-Type': 'application/json',
                     },
@@ -135,60 +207,75 @@
                         prompt: prompt,
                         model: model,
                     })
-                });
+                }).finally(() => clearTimeout(timeoutId));
 
+                // Handle response
                 if (!response.ok) {
                     const contentType = response.headers.get('content-type');
                     let errorMessage = `Error: ${response.status}`;
 
                     if (contentType && contentType.includes('application/json')) {
-                        const errorData = await response.json();
-                        errorMessage = errorData.error || errorMessage;
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.error || errorMessage;
+                        } catch (e) {
+                            // JSON parse error, use status message
+                        }
                     }
 
                     throw new Error(errorMessage);
                 }
 
+                // Process image
                 const blob = await response.blob();
+                
+                if (!blob.type.startsWith('image/')) {
+                    throw new Error('Invalid response: expected image data');
+                }
+
                 currentImageBlob = blob;
                 
+                // Display image
                 const localImageUrl = URL.createObjectURL(blob);
-                const imgElement = document.getElementById('generatedImage');
-                imgElement.src = localImageUrl;
+                generatedImage.src = localImageUrl;
                 
-                document.getElementById('resultSection').classList.add('active');
-                
-                imgElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                resultSection.classList.add('active');
+                generatedImage.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 
             } catch (error) {
-                console.error('Error:', error);
-                showError(error.message || 'Failed to generate image. Please try again.');
+                // Handle different error types
+                if (error.name === 'AbortError') {
+                    showError('Request timeout. Please try again.');
+                } else {
+                    console.error('Generation error:', error);
+                    showError(error.message || 'Failed to generate image. Please try again.');
+                }
             } finally {
-                showLoading(false);
+                setLoading(false);
             }
         }
 
+        // Download Image
         function downloadImage() {
             if (!currentImageBlob) {
-                showError('No image to download.');
+                showError('No image to download. Generate an image first.');
                 return;
             }
 
-            const url = URL.createObjectURL(currentImageBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ai-generated-${Date.now()}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        document.getElementById('prompt').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && e.ctrlKey) {
-                generateImage();
+            try {
+                const url = URL.createObjectURL(currentImageBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `ai-generated-${Date.now()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Download error:', error);
+                showError('Failed to download image. Please try again.');
             }
-        });
+        }
     </script>
 </body>
 </html>

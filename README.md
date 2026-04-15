@@ -120,7 +120,7 @@ To run this project locally with the serverless function:
 3. **Create a `.env` file** in the root directory:
    ```env
    OPENAI_API_KEY=your_openrouter_key_here
-   OPENAI_MODEL=qwen/qwen3.6-plus:free
+   OPENAI_MODEL=mistral/mistral-7b-instruct:free
    OPENAI_BASE_URL=https://openrouter.ai/api/v1
    OPENROUTER_APP_NAME=AI-Image-generator
    OPENROUTER_APP_URL=https://localhost
